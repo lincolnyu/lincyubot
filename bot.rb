@@ -56,6 +56,12 @@ def guard_input_msg(s)
    return s[0, 20] + "...total msglen #{s.length()}"
 end
 
+def try_send_message(bot, chat_id, text, parse_mode)
+    bot.api.send_message(chat_id: chat_id, text: text, parse_mode: parse_mode)
+rescue Exception => err
+    print "Some error occurred when sending message on chat #{chat_id}: #{err}"
+end
+
 # Load config
 cfg_file = File.open('config.yaml')
 cfg_str  = cfg_file.read
@@ -106,7 +112,7 @@ begin
     
                     $subscribed.each do |chat_id|
                         reply_texts.each do |reply_text|
-                            bot.api.send_message(chat_id: chat_id, text: reply_text, parse_mode: "Markdown")
+                            try_send_message(bot, chat_id, reply_text, "Markdown")
                         end
                     end
                 end
@@ -179,7 +185,7 @@ begin
             end
             reply_texts.each do |reply_text|
                 puts("2replytxt: " + reply_text)
-                bot.api.send_message(chat_id: message.chat.id, text: reply_text, parse_mode: "Markdown")
+                try_send_message(bot, message.chat.id, reply_text, "Markdown")
             end
             if message.from
                 log_str = "#{Time.now.inspect}: Messages sent to @#{message.from.username} in response to '#{guard_input_msg(message.text)}'."
