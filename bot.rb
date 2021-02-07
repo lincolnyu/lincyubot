@@ -108,6 +108,8 @@ begin
                                 reply_texts.push(tw_text)
                             end
                         end
+                    rescue Exception=>err
+                        print "Some error occurred when trying to retrieve timeline: #{err}."
                     end
     
                     $subscribed.each do |chat_id|
