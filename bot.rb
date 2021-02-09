@@ -4,10 +4,13 @@ require 'yaml'
 
 $subscribed = Set[]
 
+$data_folder = './'
+
 def load_userdata
     $subscribed = Set[]
-    if File.exists?('userdata.yaml')
-        userdata_file = File.open('userdata.yaml')
+    userdata_filepath = File.join($data_folder, 'userdata.yaml')
+    if File.exists?(userdata_filepath)
+        userdata_file = File.open(userdata_filepath)
         userdata_str = userdata_file.read
         userdata = YAML.load(userdata_str)
         if userdata.key?('subscribed')
@@ -25,8 +28,9 @@ $recommended_tweeters_latest_tweets = {}
 
 def load_commondata
     $recommended_tweeters_latest_tweets = {}
-    if File.exists?('commondata.yaml')
-        data_file = File.open('commondata.yaml')
+    commondata_filepath = File.join($data_folder, "commondata.yaml")
+    if File.exists?(commondata_filepath)
+        data_file = File.open(commondata_filepath)
         data_str = data_file.read
         data = YAML.load(data_str)
         if data && data.key?('recommended_tweeters_latest_tweets')
@@ -36,8 +40,9 @@ def load_commondata
 end
 
 def save_commondata
+    commondata_filepath = File.join($data_folder, "commondata.yaml")
     data = {'recommended_tweeters_latest_tweets' => $recommended_tweeters_latest_tweets}
-    File.write('commondata.yaml', data.to_yaml())
+    File.write(commondata_filepath, data.to_yaml())
 end
 
 def get_tweet_url(tweeter, tweet_id)
@@ -75,6 +80,10 @@ tw_client = Twitter::REST::Client.new do |config|
     config.access_token_secret = cfg_data['twitter']['access_token_secret']
 end
 
+if cfg_data.key?('datafolder')
+    $data_folder = cfg_data['data_folder']
+end
+
 recommended_tweeters = ["thealicesmith", "Anya_jebiga", "EraseState", "jordanbpeterson", "prageru", "roadtoserfdom3"]
 help_msg = "I'm a bot by @lincyu, currently with very limited functionality:\n" \
          + "/greet: Bonjour.\n" \
@@ -104,7 +113,7 @@ begin
                                 $recommended_tweeters_latest_tweets[tweeter] = tweet.id
                                 save_commondata
                                 #TODO use markdown
-                                tw_text = "<feed>\n" + laund(tweet.full_text) + "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
+                                tw_text = "🔔\n" + laund(tweet.full_text) + "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
                                 reply_texts.push(tw_text)
                             end
                         end
