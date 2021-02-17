@@ -50,7 +50,7 @@ def get_tweet_url(tweeter, tweet_id)
     return "twitter.com/" + tweeter + "/status/" + tweet_id.to_s
 end
 
-def laund(s)
+def launder(s)
     #return s
     return s.gsub('*', '\\*').gsub('_', '\\_')
 end
@@ -87,9 +87,9 @@ $help_msg = "Hello. I'm a bot by @lincyu, currently writh limited functionality:
 
 $start_msg = $help_msg + "\n" \
            + "Or check out:\n" \
-           + "- minds.com/lincyu\n" \
-           + "- t.me/philosophy_individualism\n" \
-           + "- t.me/finestclassic\n" \
+           + "minds.com/lincyu\n" \
+           + "t.me/philosophy_individualism\n" \
+           + "t.me/finestclassic\n" \
 
 load_commondata
 load_userdata
@@ -119,7 +119,7 @@ begin
                                 $recommended_tweeters_latest_tweets[tweeter] = tweet.id
                                 save_commondata
                                 #TODO use markdown
-                                tw_text = "🔔\n" + laund(tweet.full_text) + "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
+                                tw_text = "🔔\n" + launder(tweet.full_text) + "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
                                 reply_texts.push(tw_text)
                             end
                         end
@@ -141,9 +141,9 @@ begin
             reply_texts = []
             case message.text
             when '/start', '/help'
-                reply_texts.push($start_msg)
+                reply_texts.push(launder($start_msg))
             when '/about', '/intro'
-                reply_texts.push(laund("Feel free to check out:\n" \
+                reply_texts.push(launder("Feel free to check out:\n" \
                         + "minds.com/lincyu\n" \
                         + "t.me/philosophy_individualism\n" \
                         + "t.me/finestclassic\n" \
@@ -167,7 +167,7 @@ begin
                 tweeters.each do |tweeter|
                     tweets = tw_client.user_timeline(tweeter, tweet_mode:"extended", exclude_replies: true, count: twcount)
                     tweets.each do |tweet|
-                        t = laund(tweet.full_text)
+                        t = launder(tweet.full_text)
                         t += "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
                         reply_texts.push(t)
                     end
@@ -177,22 +177,22 @@ begin
                 #TODO Performance review point 
                 save_userdata
                 puts "#{Time.now.inspect}: Chat id #{message.chat.id} subscribed"
-                reply_texts.push(laund("Subscribed.\n"))
+                reply_texts.push(launder("Subscribed.\n"))
             when '/unsub'
                 $subscribed.delete(message.chat.id)
                 #TODO Performance review point 
                 save_userdata
                 puts "#{Time.now.inspect}: Chat id #{message.chat.id} unsubscribed"
-                reply_texts.push(laund("Unsubscribed.\n"))
+                reply_texts.push(launder("Unsubscribed.\n"))
             when '/status'
                 if $subscribed.include?(message.chat.id)
-                    reply_texts.push(laund("Subscribed.\n"))
+                    reply_texts.push(launder("Subscribed.\n"))
                 else
-                    reply_texts.push(laund("Unsubscribed.\n"))
+                    reply_texts.push(launder("Unsubscribed.\n"))
                 end
             else
                 if message.from && message.chat.type=="private"
-                    reply_texts.push(laund("Sorry, I have no idea what '#{message.text}' means.\n" + $help_msg))
+                    reply_texts.push(launder("Sorry, I have no idea what '#{message.text}' means.\n" + $help_msg))
                 end
             end
             reply_texts.each do |reply_text|
