@@ -79,11 +79,17 @@ begin
 end
 
 $help_msg = "Hello. I'm a bot by @lincyu, currently writh limited functionality:\n" \
-         + "/about: Intro and latest news.\n" \
-         + "/help: Show this help.\n" \
-         + "/tweed [tweeter_id [tweet_count]]: Give me the latest tweet(s).\n" \
-         + "/sub, /unsub: Subscribe or unsubscribe for updates.\n" \
-         + "/status: Subscription status."
+          + "/about: Intro and latest news.\n" \
+          + "/help: Show this help.\n" \
+          + "/tweed [tweeter_id [tweet_count]]: Give me the latest tweet(s).\n" \
+          + "/sub, /unsub: Subscribe or unsubscribe for updates.\n" \
+          + "/status: Subscription status."
+
+$start_msg = $help_msg + "\n" \
+           + "Or check out:\n" \
+           + "- minds.com/lincyu\n" \
+           + "- t.me/philosophy_individualism\n" \
+           + "- t.me/finestclassic\n" \
 
 load_commondata
 load_userdata
@@ -135,7 +141,7 @@ begin
             reply_texts = []
             case message.text
             when '/start', '/help'
-                reply_texts.push($help_msg)
+                reply_texts.push($start_msg)
             when '/about', '/intro'
                 reply_texts.push(laund("Feel free to check out:\n" \
                         + "minds.com/lincyu\n" \
