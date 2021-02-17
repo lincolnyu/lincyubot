@@ -136,10 +136,11 @@ begin
             case message.text
             when '/start', '/help'
                 reply_texts.push($help_msg)
-            when '/about'
+            when '/about', '/intro'
                 reply_texts.push(laund("Feel free to check out:\n" \
                         + "minds.com/lincyu\n" \
                         + "t.me/philosophy_individualism\n" \
+                        + "t.me/finestclassic\n" \
                         + "(inactive) lincyu on mastodon/mewe/safechat/gab"))
             when /tweed/i, /twitter/i
                 textl = message.text
