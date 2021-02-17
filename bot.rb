@@ -189,7 +189,6 @@ begin
                 end
             end
             reply_texts.each do |reply_text|
-                puts("2replytxt: " + reply_text)
                 try_send_message(bot, message.chat.id, reply_text, "Markdown")
             end
             if message.from
