@@ -137,75 +137,84 @@ begin
             end
         end
     
-        bot.listen do |message|
-            reply_texts = []
-            case message.text
-            when '/start', '/help'
-                reply_texts.push(launder($start_msg))
-            when '/about', '/intro'
-                reply_texts.push(launder("Feel free to check out:\n" \
-                        + "minds.com/lincyu\n" \
-                        + "t.me/philosophy_individualism\n" \
-                        + "t.me/finestclassic\n" \
-                        + "(inactive) lincyu on mastodon/mewe/safechat/gab"))
-            when /tweed/i, /twitter/i
-                textl = message.text
-                textl.downcase!
-                m = textl.match /tweed[ ]+(?<name>[^ ]+)([ ]+(?<count>\d+)|.*)/
-                twcount = 1
-                if m
-                    tw = m[:name]
-                    tw.strip!
-                    tweeters = [tw]
-                    if m[:count]
-                        twcount = m[:count]
+        while true
+            begin
+                bot.listen do |message|
+                    reply_texts = []
+                    case message.text
+                    when '/start', '/help'
+                        reply_texts.push(launder($start_msg))
+                    when '/about', '/intro'
+                        reply_texts.push(launder("Feel free to check out:\n" \
+                                + "minds.com/lincyu\n" \
+                                + "t.me/philosophy_individualism\n" \
+                                + "t.me/finestclassic\n" \
+                                + "(inactive) lincyu on mastodon/mewe/safechat/gab"))
+                    when /tweed/i, /twitter/i
+                        textl = message.text
+                        textl.downcase!
+                        m = textl.match /tweed[ ]+(?<name>[^ ]+)([ ]+(?<count>\d+)|.*)/
+                        twcount = 1
+                        if m
+                            tw = m[:name]
+                            tw.strip!
+                            tweeters = [tw]
+                            if m[:count]
+                                twcount = m[:count]
+                            end
+                        else
+                            tweeters = $recommended_tweeters
+                        end
+                        res = ""
+                        tweeters.each do |tweeter|
+                            tweets = tw_client.user_timeline(tweeter, tweet_mode:"extended", exclude_replies: true, count: twcount)
+                            tweets.each do |tweet|
+                                t = launder(tweet.full_text)
+                                t += "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
+                                reply_texts.push(t)
+                            end
+                        end
+                    when '/sub'
+                        $subscribed.add(message.chat.id)
+                        #TODO Performance review point 
+                        save_userdata
+                        puts "#{Time.now.inspect}: Chat id #{message.chat.id} subscribed"
+                        reply_texts.push(launder("Subscribed.\n"))
+                    when '/unsub'
+                        $subscribed.delete(message.chat.id)
+                        #TODO Performance review point 
+                        save_userdata
+                        puts "#{Time.now.inspect}: Chat id #{message.chat.id} unsubscribed"
+                        reply_texts.push(launder("Unsubscribed.\n"))
+                    when '/status'
+                        if $subscribed.include?(message.chat.id)
+                            reply_texts.push(launder("Subscribed.\n"))
+                        else
+                            reply_texts.push(launder("Unsubscribed.\n"))
+                        end
+                    else
+                        if message.from && message.chat.type=="private"
+                            reply_texts.push(launder("Sorry, I have no idea what '#{message.text}' means.\n" + $help_msg))
+                        end
                     end
-                else
-                    tweeters = $recommended_tweeters
-                end
-                res = ""
-                tweeters.each do |tweeter|
-                    tweets = tw_client.user_timeline(tweeter, tweet_mode:"extended", exclude_replies: true, count: twcount)
-                    tweets.each do |tweet|
-                        t = launder(tweet.full_text)
-                        t += "\n -- [" + tweeter + "](" + get_tweet_url(tweeter, tweet.id) + ")"
-                        reply_texts.push(t)
+                    reply_texts.each do |reply_text|
+                        try_send_message(bot, message.chat.id, reply_text, "Markdown")
                     end
+                    if message.from
+                        log_str = "#{Time.now.inspect}: Messages sent to @#{message.from.username} in response to '#{guard_input_msg(message.text)}'."
+                    else
+                        log_str = "#{Time.now.inspect}: Messages sent to anonymous in response to '#{guard_input_msg(message.text)}'."
+                    end
+                    puts log_str
                 end
-            when '/sub'
-                $subscribed.add(message.chat.id)
-                #TODO Performance review point 
-                save_userdata
-                puts "#{Time.now.inspect}: Chat id #{message.chat.id} subscribed"
-                reply_texts.push(launder("Subscribed.\n"))
-            when '/unsub'
-                $subscribed.delete(message.chat.id)
-                #TODO Performance review point 
-                save_userdata
-                puts "#{Time.now.inspect}: Chat id #{message.chat.id} unsubscribed"
-                reply_texts.push(launder("Unsubscribed.\n"))
-            when '/status'
-                if $subscribed.include?(message.chat.id)
-                    reply_texts.push(launder("Subscribed.\n"))
-                else
-                    reply_texts.push(launder("Unsubscribed.\n"))
-                end
-            else
-                if message.from && message.chat.type=="private"
-                    reply_texts.push(launder("Sorry, I have no idea what '#{message.text}' means.\n" + $help_msg))
-                end
+            rescue Faraday::ConnectionFailed => err:
+                print "ConnectionFailed occured: #{err}"
+                print "Attempt to listen again..."
             end
-            reply_texts.each do |reply_text|
-                try_send_message(bot, message.chat.id, reply_text, "Markdown")
-            end
-            if message.from
-                log_str = "#{Time.now.inspect}: Messages sent to @#{message.from.username} in response to '#{guard_input_msg(message.text)}'."
-            else
-                log_str = "#{Time.now.inspect}: Messages sent to anonymous in response to '#{guard_input_msg(message.text)}'."
-            end
-            puts log_str
         end
     end
 rescue Telegram::Bot::Exceptions::ResponseError => err
     print "ResponseError occurred: #{err}"
+rescue => err
+    print "Some unexpected error occurred: #{err}"
 end
