@@ -2,3 +2,5 @@
 *.log
 *.lock
 /data
+*/bin/
+*/obj/
