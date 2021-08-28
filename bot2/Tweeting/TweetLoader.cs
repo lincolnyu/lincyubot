@@ -164,62 +164,68 @@ namespace bot2.Tweeting
 
         private IEnumerable<Tweet> YieldTweets()
         {
-            // TODO: Proper implementation message queue ...
-            var tweeters = _data["tweeters"] as DictNode;
-            if (tweeters != null)
-            { 
-                // sorted first by tweeters and then chronolgical order (since last displayed tweet)               
-                foreach (var (tweeter, tdata) in tweeters)
+            lock(_data)
+            {
+                // TODO: Proper implementation message queue ...
+                var tweeters = _data["tweeters"] as DictNode;
+                if (tweeters != null)
                 {
-                    string new_last_tweet_id = null;
-                    var lti = tdata["last_tweet_id"];
-                    if (lti != null)
+                    // sorted first by tweeters and then chronolgical order (since last displayed tweet)
+                    foreach (var (tweeter, tdata) in tweeters)
                     {
-                        IEnumerable<Tweet> tweets;
-                        try
+                        string new_last_tweet_id = null;
+                        var lti = tdata["last_tweet_id"];
+                        if (lti != null)
                         {
-                            tweets = GetTweets(tweeter, 20, DefaultGetTweetsResultHandler);
-                        }
-                        catch (WebException)
-                        {
-                            //TODO automatically remove?
-                            Console.WriteLine($"Error getting tweets from {tweeter}");
-                            continue;
-                        }
-
-                        var yieldCount = 0;
-                        var last_tweet_id = lti.ToString();
-                        // Assuming tweets are in chronological order
-                        foreach (var tweet in tweets)
-                        {
-                            if (tweet.TweetInfo.Id == last_tweet_id)
+                            IEnumerable<Tweet> tweets;
+                            try
                             {
-                                break;
+                                tweets = GetTweets(tweeter, 20, DefaultGetTweetsResultHandler);
                             }
-                            if (new_last_tweet_id == null)
+                            catch (WebException)
                             {
-                                new_last_tweet_id = tweet.TweetInfo.Id;
-                            }              
-                            yield return tweet;
-                            yieldCount++;
-                        }
-                        Console.WriteLine($"Obtained {yieldCount} new tweets from '{tweeter}'");
-                    }
-                    else
-                    {
-                        var tweets = GetTweets(tweeter, 1, DefaultGetTweetsResultHandler).ToArray();
-                        if (tweets.Length > 0)
-                        {
-                            var tweet = tweets[0];
-                            new_last_tweet_id = tweet.TweetInfo.Id;
-                            Console.WriteLine($"Obtained 1 new tweets from '{tweeter}'");
-                            yield return tweet;
-                        }
-                    }
+                                //TODO automatically remove?
+                                Console.WriteLine($"Error getting tweets from {tweeter}");
+                                continue;
+                            }
 
-                    if (new_last_tweet_id != null)
-                    {
-                        tdata["last_tweet_id"] = new ValueNode(new_last_tweet_id);
+                            var yieldCount = 0;
+                            var last_tweet_id = lti.ToString();
+                            // Assuming tweets are in chronological order
+                            foreach (var tweet in tweets)
+                            {
+                                if (tweet.TweetInfo.Id == last_tweet_id)
+                                {
+                                    break;
+                                }
+                                if (new_last_tweet_id == null)
+                                {
+                                    new_last_tweet_id = tweet.TweetInfo.Id;
+                                }
+                                yield return tweet;
+                                yieldCount++;
+                            }
+                            if (yieldCount > 0)
+                            {
+                                Console.WriteLine($"Obtained {yieldCount} new tweets from '{tweeter}'");
+                            }
+                        }
+                        else
+                        {
+                            var tweets = GetTweets(tweeter, 1, DefaultGetTweetsResultHandler).ToArray();
+                            if (tweets.Length > 0)
+                            {
+                                var tweet = tweets[0];
+                                new_last_tweet_id = tweet.TweetInfo.Id;
+                                Console.WriteLine($"Obtained 1 new tweets from '{tweeter}'");
+                                yield return tweet;
+                            }
+                        }
+
+                        if (new_last_tweet_id != null)
+                        {
+                            tdata["last_tweet_id"] = new ValueNode(new_last_tweet_id);
+                        }
                     }
                 }
             }
@@ -227,26 +233,29 @@ namespace bot2.Tweeting
 
         public IEnumerable<Tweet> YieldCurrentTweets()
         {
-            var tweeters = _data["tweeters"] as DictNode;
-            if (tweeters != null)
-            { 
-                // sorted first by tweeters and then chronolgical order (since last displayed tweet)               
-                foreach (var (tweeter, tdata) in tweeters)
+            lock(_data)
+            {
+                var tweeters = _data["tweeters"] as DictNode;
+                if (tweeters != null)
                 {
-                    Tweet[] tweets;
-                    try
+                    // sorted first by tweeters and then chronolgical order (since last displayed tweet)
+                    foreach (var (tweeter, tdata) in tweeters)
                     {
-                        tweets = GetTweets(tweeter, 1).ToArray();
-                    }
-                    catch (WebException)
-                    {
-                        //TODO automatically remove?
-                        Console.WriteLine($"Error getting tweets from {tweeter}");
-                        continue;
-                    }
-                    if (tweets.Length == 1) 
-                    {
-                        yield return tweets[0];
+                        Tweet[] tweets;
+                        try
+                        {
+                            tweets = GetTweets(tweeter, 1).ToArray();
+                        }
+                        catch (WebException)
+                        {
+                            //TODO automatically remove?
+                            Console.WriteLine($"Error getting tweets from {tweeter}");
+                            continue;
+                        }
+                        if (tweets.Length == 1)
+                        {
+                            yield return tweets[0];
+                        }
                     }
                 }
             }

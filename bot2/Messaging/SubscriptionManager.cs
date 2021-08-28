@@ -115,6 +115,23 @@ namespace bot2.Messaging
             }
         }
 
+        public bool Subscribed(long chatId, string subscriptionName)
+        {
+            if (!AllSubscriptions.TryGetValue(subscriptionName, out var subscription))
+            {
+                return false;
+            }
+            if (!AllSubscribers.TryGetValue(chatId, out var subscriber))
+            {
+                return false;
+            }
+            if (!subscriber.Subscriptions.Contains(subscription))
+            {
+                return false;
+            }
+            return true;
+        }
+
         public void RemoveSubscriber(long chatId)
         {
             var subscriber = AllSubscribers[chatId];

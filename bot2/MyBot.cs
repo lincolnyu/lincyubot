@@ -96,11 +96,6 @@ namespace bot2
 
         public void Dispose()
         {
-            if (BotClient != null)
-            {
-                BotClient.StopReceiving();
-                BotClient = null;
-            }
             if (_tweetLoader != null)
             {
                 _tweetLoader.Dispose();
@@ -110,6 +105,11 @@ namespace bot2
             {
                 _subscriptionManager.Dispose();
                 _subscriptionManager = null;
+            }
+            if (BotClient != null)
+            {
+                BotClient.StopReceiving();
+                BotClient = null;
             }
         }
 
@@ -131,7 +131,7 @@ namespace bot2
                     await ShowHelp(chatId);
                     break;
                 case "/about":
-                case "/inxo":
+                case "/info":
                     await ShowAbout(chatId);
                     break;
                 case "/sub":
@@ -165,6 +165,27 @@ namespace bot2
                         }
                         await ShowRecentTweetsOfUsers(chatId, tweeters, count);
                     }
+                    else if (msg.Contains("addsub") || msg.Contains("removesub"))
+                    {
+                        var isAdd = msg.Contains("addsub");
+                        var rxptn = isAdd ?
+                            @"addsub[ ]+(?<name>[^ ]+)":
+                            @"removesub[ ]+(?<name>[^ ]+)";
+                        var rexTweet = new Regex(rxptn);
+                        var m = rexTweet.Match(msg);
+                        if (m.Success)
+                        {
+                            var subscriptionName = m.Groups["name"].Value;
+                            if (isAdd)
+                            {
+                                Subscribe(chatId, subscriptionName);
+                            }
+                            else
+                            {
+                                Unsubscribe(chatId, subscriptionName);
+                            }
+                        }
+                    }
                     break;
                 }
             }
@@ -176,10 +197,11 @@ namespace bot2
             sb.AppendLine("Hello. I'm a bot by @lincyu, currently writh limited functionality:");
             sb.AppendLine("/about: Intro and latest news.");
             sb.AppendLine("/help: Show this help.");
-            sb.AppendLine("/fetch [tweeter_id [tweet_count]]: Give me the latest tweet(s).");
             sb.AppendLine("/refresh: Get the latest of the current subscriptions.");
             sb.AppendLine("/sub, /unsub: Subscribe or unsubscribe for updates.");
             sb.AppendLine("/status: Subscription status.");
+            sb.AppendLine("fetch [tweeter_id [tweet_count]]: Give me the latest tweet(s).");
+            sb.AppendLine("<add|remove>sub tweeter_id: Subscribe or unsubscribe certain tweeters.");
             await BotClient.SendTextMessageAsync(
                 chatId: chatId,
                 text:   sb.ToString()
@@ -210,13 +232,42 @@ namespace bot2
             _subscriptionManager.RemoveSubscriber(chatId);
         }
 
+        private void Subscribe(long chatId, string subscriptionName)
+        {
+            _subscriptionManager.AddSubscription(chatId, subscriptionName);
+        }
+
+        private void Unsubscribe(long chatId, string subscriptionName)
+        {
+            if (_subscriptionManager.Subscribed(chatId, subscriptionName))
+            {
+                _subscriptionManager.RemoveSubscription(chatId, subscriptionName);
+            }
+        }
+
         private async Task ShowSubscriptionStatus(long chatId)
         {
-            var subscrstr = _subscriptionManager.AllSubscribers.ContainsKey(chatId)?
-                "subscribed" : "not subscribed";
+            var subscribed = _subscriptionManager.AllSubscribers.TryGetValue(chatId,
+                out var subscriber);
+            var sb = new StringBuilder(subscribed? "subscribed" : "not subscribed.");
+            if (subscribed)
+            {
+                if (subscriber.Subscriptions.Count > 0)
+                {
+                    sb.AppendLine(":");
+                    foreach (var sub in subscriber.Subscriptions)
+                    {
+                        sb.AppendLine($" - {sub.Name}");
+                    }
+                }
+                else
+                {
+                    sb.AppendLine(" to 0 subscriptions.");
+                }
+            }
             await BotClient.SendTextMessageAsync(
                 chatId: chatId,
-                text:   $"You are {subscrstr}."
+                text:   $"You are {sb.ToString()}"
             );
         }
 
@@ -246,7 +297,6 @@ namespace bot2
                 }
             }
         }
-
 
         private async Task PostMessage(long chatId, Tweet tweet)
         {
