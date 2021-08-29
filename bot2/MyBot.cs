@@ -17,7 +17,6 @@ namespace bot2
 {
     class MyBot : IDisposable
     {
-        const int DefaultIntervalSecs = 15;
         private TweetLoader _tweetLoader;
 
         public TelegramBotClient BotClient { get; private set; }
@@ -51,7 +50,9 @@ namespace bot2
                 }
             }
             var intv = cfg["update_interval_secs"] as ValueNode;
-            int updateIntervalSecs = intv?? DefaultIntervalSecs;
+            int updateIntervalSecs = intv?? TweetLoader.DefaultProcessIntervalSecs;
+            var saveintv = cfg["save_interval_multiple"] as ValueNode;
+            int saveIntervalMultiple = saveintv?? TweetLoader.DefaultSaveIntervalMultiple;
             var twtCfg = cfg["twitter"];
             var twitterParams = new TwitterParams {
                 ConsumerKey = twtCfg["consumer_key"],
@@ -59,11 +60,11 @@ namespace bot2
                 AccessToken = twtCfg["access_token"],
                 AccessTokenSecret = twtCfg["access_token_secret"]
             };
-            return new MyBot(botToken, twitterParams, recommendedTweeters, dataFolder, updateIntervalSecs, logger);
+            return new MyBot(botToken, twitterParams, recommendedTweeters, dataFolder, updateIntervalSecs, saveIntervalMultiple, logger);
         }
 
         public MyBot(string token, TwitterParams twitterParams, List<string> recommendedTweeters, 
-            string dataFolder, int updateIntervalSecs, ILogger logger = null)
+            string dataFolder, int updateIntervalSecs, int saveIntervalMultiple, ILogger logger = null)
         {
             RecommendedTweeters = recommendedTweeters;
             Logger = logger;
@@ -81,7 +82,7 @@ namespace bot2
                 twitterParams.ConsumerKeySecret,
                 twitterParams.AccessToken,
                 twitterParams.AccessTokenSecret);
-            _tweetLoader = new TweetLoader(twitter, tweeterFile, _subscriptionManager, updateIntervalSecs);
+            _tweetLoader = new TweetLoader(twitter, tweeterFile, _subscriptionManager, updateIntervalSecs, saveIntervalMultiple);
             foreach (var tweeter in recommendedTweeters)
             {
                 _tweetLoader.AddSubscription(new Subscription(name:tweeter));
@@ -156,12 +157,23 @@ namespace bot2
                         if (m.Success)
                         {
                             var name = m.Groups["name"].Value;
-                            count = int.Parse(m.Groups["count"].Value);
+                            if (m.Groups.ContainsKey("count "))
+                            {
+                                count = int.Parse(m.Groups["count"].Value);
+                            }
                             tweeters = new List<string>{name};
                         }
                         else
                         {
-                            tweeters = RecommendedTweeters;
+                            var sub = _subscriptionManager.GetSubscriptions(chatId);
+                            if (sub != null)
+                            {
+                                tweeters = sub.Select(x=>x.Name).ToList();
+                            }
+                            else
+                            {
+                                tweeters = new List<string>{};
+                            }
                         }
                         await ShowRecentTweetsOfUsers(chatId, tweeters, count);
                     }
@@ -247,15 +259,14 @@ namespace bot2
 
         private async Task ShowSubscriptionStatus(long chatId)
         {
-            var subscribed = _subscriptionManager.AllSubscribers.TryGetValue(chatId,
-                out var subscriber);
-            var sb = new StringBuilder(subscribed? "subscribed" : "not subscribed.");
-            if (subscribed)
+            var subscriptions = _subscriptionManager.GetSubscriptions(chatId);
+            var sb = new StringBuilder(subscriptions != null? "subscribed" : "not subscribed.");
+            if (subscriptions != null)
             {
-                if (subscriber.Subscriptions.Count > 0)
+                if (subscriptions.Count > 0)
                 {
-                    sb.AppendLine(":");
-                    foreach (var sub in subscriber.Subscriptions)
+                    sb.AppendLine(" to:");
+                    foreach (var sub in subscriptions)
                     {
                         sb.AppendLine($" - {sub.Name}");
                     }

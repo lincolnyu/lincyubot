@@ -14,6 +14,9 @@ namespace bot2.Tweeting
     // https://www.youtube.com/watch?v=ifZXSzwff4E
     class TweetLoader : IDisposable
     {
+        public const int DefaultProcessIntervalSecs = 15;
+        public const int DefaultSaveIntervalMultiple = 20;
+
         public delegate Task DisplayTweet(Tweet tweet);
         private Node _data;
         private SubscriptionManager _subscriptionManager;
@@ -21,15 +24,20 @@ namespace bot2.Tweeting
         private Twitter _twitter;
         private string _dataFile;
         private Thread _workingThread;
-        private int _intervalSecs;
+        private int _processIntervalSecs;
+        private int _saveIntervalMultiple;
         private bool _running = false;
         private ManualResetEvent _quitEvent = new ManualResetEvent(false);
 
-        public TweetLoader(Twitter twitter, string dataFile, SubscriptionManager subscriptionManager, int intervalSecs = 15, bool start=false)
+        private bool _dirty = false;
+
+        public TweetLoader(Twitter twitter, string dataFile, SubscriptionManager subscriptionManager, int processIntervalSecs=DefaultProcessIntervalSecs, 
+            int saveIntervalMultipole=DefaultSaveIntervalMultiple, bool start=false)
         {
             _twitter = twitter;
             _dataFile = dataFile;
-            _intervalSecs = intervalSecs;
+            _processIntervalSecs = processIntervalSecs;
+            _saveIntervalMultiple = saveIntervalMultipole;
             
             _subscriptionManager = subscriptionManager;
 
@@ -47,11 +55,13 @@ namespace bot2.Tweeting
             if (_data == null)
             {
                 _data = new DictNode();
+                _dirty = true;
             }
 
             if (_data["tweeters"] == null)
             {
                 _data["tweeters"] = new DictNode();
+                _dirty = true;
             }
 
             var tweetersData = (DictNode)_data["tweeters"];
@@ -60,6 +70,7 @@ namespace bot2.Tweeting
                 if (tweetersData[key] == null)
                 {
                     tweetersData[key] = new DictNode();
+                    _dirty = true;
                 }
             }
             subscriptionManager.SubscriptionAdded += subscription =>
@@ -69,6 +80,7 @@ namespace bot2.Tweeting
                     if (tweetersData[subscription.Name] == null)
                     {
                         tweetersData[subscription.Name] = new DictNode();
+                        _dirty = true;
                     }
                 }
             };
@@ -76,7 +88,10 @@ namespace bot2.Tweeting
             {
                 lock(_data)
                 {
-                    ((DictNode)tweetersData).Remove(subscription.Name);
+                    if (((DictNode)tweetersData).Remove(subscription.Name))
+                    {
+                        _dirty = true;
+                    }
                 }
             };
 
@@ -125,31 +140,51 @@ namespace bot2.Tweeting
                 {
                     tweetersData = new DictNode();
                     _data["tweeters"] = tweetersData;
+                    _dirty = true;
                 }
                 var tweeter = subscription.Name;
                 if (tweetersData[tweeter] == null)
                 {
                     tweetersData[tweeter] = new DictNode();
+                    _dirty = true;
                 }
             }
         }
 
         public void Save()
         {
+            if (!_dirty)
+            {
+                return;
+            }
             using var swData = new StreamWriter(_dataFile);
             var serializer = new SerializerBuilder().Build();
             var s = serializer.Serialize(_data.Serialize());
             swData.Write(s);
+            _dirty = false;
         }
+
+        private void SaveAll()
+        {
+            Save();
+            _subscriptionManager.Save();
+        }
+
         private void WorkingThreadProc(object obj)
         {
-            var intervalMs = _intervalSecs*1000;
+            var processIntervalMs = _processIntervalSecs*1000;
             _running = true;
+            var saveIntervalConnt = 0;
             while (_running)
             {
                 var task = ProcessTweets();
                 task.Wait();
-                _quitEvent.WaitOne(intervalMs);
+                if (++saveIntervalConnt >= _saveIntervalMultiple)
+                {
+                    SaveAll();
+                    saveIntervalConnt = 0;
+                }
+                _quitEvent.WaitOne(processIntervalMs);
             }
         }
 
@@ -225,6 +260,7 @@ namespace bot2.Tweeting
                         if (new_last_tweet_id != null)
                         {
                             tdata["last_tweet_id"] = new ValueNode(new_last_tweet_id);
+                            _dirty = true;
                         }
                     }
                 }

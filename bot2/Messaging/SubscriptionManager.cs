@@ -24,6 +24,8 @@ namespace bot2.Messaging
         PostCallback _postCb;
         private string _dataFile;
 
+        private bool _dirty = false;
+
         public SubscriptionManager(string dataFile, PostCallback postCb)
         {
             _postCb = postCb;
@@ -63,8 +65,12 @@ namespace bot2.Messaging
             Dispose();
         }
 
-        private void Save()
+        public void Save()
         {
+            if (!_dirty)
+            {
+                return;
+            }
             var data = new Dictionary<long, List<string>>();
             foreach (var subscriber in AllSubscribers.Values)
             {
@@ -79,8 +85,13 @@ namespace bot2.Messaging
             var serializer = new SerializerBuilder().Build();
             var s = serializer.Serialize(data);
             swData.Write(s);
+            _dirty = false;
         }
 
+        private void ChangeCall(bool changed)
+        {
+            _dirty = _dirty || changed;
+        }
         public void AddSubscription(long chatId, string subscriptionName)
         {
             if (!AllSubscriptions.TryGetValue(subscriptionName, out var subscription))
@@ -88,30 +99,34 @@ namespace bot2.Messaging
                 subscription = new Subscription(subscriptionName);
                 AllSubscriptions[subscriptionName] = subscription;
                 SubscriptionAdded?.Invoke(subscription);
+                _dirty = true;
             }
             if (!AllSubscribers.TryGetValue(chatId, out var subscriber))
             {
                 subscriber = new Subscriber(chatId);
                 AllSubscribers[chatId] = subscriber;
+                _dirty = true;
             }
-            subscriber.Subscriptions.Add(subscription);
-            subscription.Subscribers.Add(subscriber);
+            ChangeCall(subscriber.Subscriptions.Add(subscription));
+            ChangeCall(subscription.Subscribers.Add(subscriber));
         }
 
         public void RemoveSubscription(long chatId, string subscriptionName)
         {
             var subscription = AllSubscriptions[subscriptionName];
             var subscriber = AllSubscribers[chatId];
-            subscriber.Subscriptions.Remove(subscription);
-            subscription.Subscribers.Remove(subscriber);
+            ChangeCall(subscriber.Subscriptions.Remove(subscription));
+            ChangeCall(subscription.Subscribers.Remove(subscriber));
             if (subscription.Subscribers.Count == 0)
             {
                 AllSubscriptions.Remove(subscriptionName);
                 SubscriptionRemoved?.Invoke(subscription);
+                _dirty = true;
             }
             if (subscriber.Subscriptions.Count == 0)
             {
                 AllSubscribers.Remove(chatId);
+                _dirty = true;
             }
         }
 
@@ -134,11 +149,26 @@ namespace bot2.Messaging
 
         public void RemoveSubscriber(long chatId)
         {
-            var subscriber = AllSubscribers[chatId];
-            foreach(var subscr in subscriber.Subscriptions)
+            if (AllSubscribers.ContainsKey(chatId))
             {
-                RemoveSubscription(chatId, subscr.Name);
+                var subscriber = AllSubscribers[chatId];
+                foreach(var subscr in subscriber.Subscriptions)
+                {
+                    RemoveSubscription(chatId, subscr.Name);
+                }
+                AllSubscribers.Remove(chatId);
+                _dirty = true;
             }
+        }
+
+        public HashSet<Subscription> GetSubscriptions(long chatId)
+        {
+            var subscribed = AllSubscribers.TryGetValue(chatId, out var subscriber);
+            if (subscribed)
+            {
+                return subscriber.Subscriptions;
+            }
+            return null;
         }
 
         public async Task Post(Tweet tweet)
