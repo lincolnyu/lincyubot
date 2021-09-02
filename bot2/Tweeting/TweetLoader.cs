@@ -208,41 +208,37 @@ namespace bot2.Tweeting
                     // sorted first by tweeters and then chronolgical order (since last displayed tweet)
                     foreach (var (tweeter, tdata) in tweeters)
                     {
+                        if (!_running)
+                        {
+                            break;
+                        }
                         string new_last_tweet_id = null;
                         var lti = tdata["last_tweet_id"];
                         if (lti != null)
                         {
-                            IEnumerable<Tweet> tweets;
-                            try
+                            var tweets = GetTweets(tweeter, 20, DefaultGetTweetsResultHandler);
+                            if (tweets.Length > 0)
                             {
-                                tweets = GetTweets(tweeter, 20, DefaultGetTweetsResultHandler);
-                            }
-                            catch (WebException)
-                            {
-                                //TODO automatically remove?
-                                Console.WriteLine($"Error getting tweets from {tweeter}");
-                                continue;
-                            }
-
-                            var yieldCount = 0;
-                            var last_tweet_id = lti.ToString();
-                            // Assuming tweets are in chronological order
-                            foreach (var tweet in tweets)
-                            {
-                                if (tweet.TweetInfo.Id == last_tweet_id)
+                                var last_tweet_id = lti.ToString();
+                                // Assuming tweets are in chronological order
+                                var count = 0;
+                                foreach (var tweet in tweets)
                                 {
-                                    break;
+                                    if (tweet.TweetInfo.Id == last_tweet_id)
+                                    {
+                                        break;
+                                    }
+                                    if (new_last_tweet_id == null)
+                                    {
+                                        new_last_tweet_id = tweet.TweetInfo.Id;
+                                    }
+                                    yield return tweet;
+                                    ++count;
                                 }
-                                if (new_last_tweet_id == null)
+                                if (count > 0)
                                 {
-                                    new_last_tweet_id = tweet.TweetInfo.Id;
+                                    Console.WriteLine($"Obtained {count} new tweets from '{tweeter}'");
                                 }
-                                yield return tweet;
-                                yieldCount++;
-                            }
-                            if (yieldCount > 0)
-                            {
-                                Console.WriteLine($"Obtained {yieldCount} new tweets from '{tweeter}'");
                             }
                         }
                         else
@@ -303,19 +299,21 @@ namespace bot2.Tweeting
             if (!succeeded)
             {
                 Console.WriteLine($"Error: Failed to get tweets from {tweeter}");
+                // TODO should remove?
             }
         }
-        public IEnumerable<Tweet> GetTweets(string tweeter, int count, GetTweetsResultCallback resultCb=null)
+        public Tweet[] GetTweets(string tweeter, int count, GetTweetsResultCallback resultCb=null)
         {
             try
             {
+                var r = _twitter.EnumerateTweets(tweeter, count).ToArray();
                 resultCb?.Invoke(tweeter, true);
-                return _twitter.EnumerateTweets(tweeter, count);
+                return r;
             }
             catch (WebException)
             {
                 resultCb?.Invoke(tweeter, false);
-                return Enumerable.Empty<Tweet>();
+                return new Tweet[0];
             }
         }
     }
