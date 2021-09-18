@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using bot2.Logging;
 using bot2.Tweeting;
 using bot2.Yaml;
 using YamlDotNet.Serialization;
@@ -19,6 +20,9 @@ namespace bot2.Messaging
         public readonly Dictionary<string, Subscription> AllSubscriptions = new Dictionary<string, Subscription>();
         public readonly Dictionary<long, Subscriber> AllSubscribers = new Dictionary<long, Subscriber>();
 
+        public int AttemptTimes { get; set; } = 5;
+
+        public ILogger Logger { get; private set; }
 
         public delegate Task PostCallback(long chatId, Tweet tweet);
         PostCallback _postCb;
@@ -26,10 +30,11 @@ namespace bot2.Messaging
 
         private bool _dirty = false;
 
-        public SubscriptionManager(string dataFile, PostCallback postCb)
+        public SubscriptionManager(string dataFile, PostCallback postCb, ILogger logger)
         {
             _postCb = postCb;
             _dataFile = dataFile;
+            Logger = logger;
             if (File.Exists(dataFile))
             {
                 using var srData = new StreamReader(dataFile);
@@ -184,7 +189,23 @@ namespace bot2.Messaging
             }
             foreach (var subscriber in subscription.Subscribers)
             {
-                await _postCb.Invoke(subscriber.ChatId, tweet);
+                var done = false;
+                int att = 0;
+                for (att=0; !done && att < AttemptTimes; ++att)
+                {
+                    try
+                    {
+                        await _postCb.Invoke(subscriber.ChatId, tweet);
+                        done = true;
+                    }
+                    catch (Telegram.Bot.Exceptions.ApiRequestException)
+                    {
+                    }
+                }
+                if (!done)
+                {
+                    Logger?.Log($"[Error]: sending to {subscriber.ChatId} after {att} attempts.");
+                }
             }
         }
     }
