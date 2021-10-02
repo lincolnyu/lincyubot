@@ -106,12 +106,19 @@ namespace bot2.Tweeting
             {
                 var authHeader = CreateHeader(resourceUrl, method, requestParameters);
                 request.Headers.Add("Authorization", authHeader);
-                var response = request.GetResponse();
-
-                using (var sd = new StreamReader(response.GetResponseStream()))
+                try
                 {
-                    resultString = sd.ReadToEnd();
-                    response.Close();
+                    using (var response = request.GetResponse())
+                    {
+                        using (var sd = new StreamReader(response.GetResponseStream()))
+                        {
+                            resultString = sd.ReadToEnd();
+                        }
+                    }
+                }
+                catch (IOException)
+                {
+                    resultString = string.Empty;
                 }
             }
 
