@@ -75,7 +75,7 @@ namespace bot2
             BotClient.StartReceiving();
 
             var subscriptionDataFile = Path.Combine(dataFolder, "subscriptions.yaml");
-            _subscriptionManager = new SubscriptionManager(subscriptionDataFile, PostMessage);
+            _subscriptionManager = new SubscriptionManager(subscriptionDataFile, PostMessage, logger);
 
             var tweeterFile = Path.Combine(dataFolder, "tweeters.yaml");
             var twitter = new Twitter(twitterParams.ConsumerKey,
