@@ -315,6 +315,11 @@ namespace bot2.Tweeting
                 resultCb?.Invoke(tweeter, false);
                 return new Tweet[0];
             }
+            catch (IOException)
+            {
+                resultCb?.Invoke(tweeter, false);
+                return new Tweet[0];
+            }
         }
     }
 }
