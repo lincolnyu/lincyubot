@@ -201,6 +201,9 @@ namespace bot2.Messaging
                     catch (Telegram.Bot.Exceptions.ApiRequestException)
                     {
                     }
+                    catch (System.Net.Http.HttpRequestException)
+                    {
+                    }
                 }
                 if (!done)
                 {
